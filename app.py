@@ -1,8 +1,4 @@
-"""Shinobi Rock Paper Scissors - hand-gesture game (Python + OpenCV + MediaPipe + web UI).
-
-Run:  python app.py            (webcam + hand tracking)
-      python app.py --demo     (keyboard only, no camera needed)
-"""
+"""Shinobi Rock Paper Scissors - hand-gesture game entrypoint."""
 import argparse
 import threading
 import time
@@ -11,10 +7,28 @@ import webbrowser
 from werkzeug.serving import make_server
 
 from src.config import Config
-from src.demo_worker import DemoWorker
 from src.game_engine import GameEngine
-from src.hub import Hub
 from src.server import create_app
+
+
+class Hub:
+    def __init__(self):
+        self.seq = 0
+        self.payload = None
+        self.jpeg = None
+        self._condition = threading.Condition()
+
+    def publish(self, jpeg, payload_json):
+        with self._condition:
+            self.seq += 1
+            self.jpeg = jpeg
+            self.payload = payload_json
+            self._condition.notify_all()
+
+    def wait_for_update(self, after_seq, timeout=None):
+        with self._condition:
+            self._condition.wait_for(lambda: self.seq > after_seq, timeout)
+            return self.seq, self.jpeg, self.payload
 
 
 def main():
@@ -34,18 +48,16 @@ def main():
     engine, lock, hub = GameEngine(cfg), threading.Lock(), Hub()
     stop = threading.Event()
 
-    if args.demo:
-        worker = DemoWorker(cfg, engine, lock, hub)
-        demo_worker = worker
-    else:
-        from src.vision_worker import VisionWorker      # imports mediapipe, only when needed
-        worker = VisionWorker(cfg, engine, lock, hub, on_quit=stop.set)
-        demo_worker = None
-
-    app = create_app(engine, lock, hub, on_quit=stop.set, demo_worker=demo_worker)
+    app = create_app(engine, lock, hub, on_quit=stop.set)
     server = make_server(cfg.host, cfg.port, app, threaded=True)
     threading.Thread(target=server.serve_forever, daemon=True, name="http").start()
-    worker.start()
+
+    if not args.demo:
+        from src.vision_worker import VisionWorker
+        worker = VisionWorker(cfg, engine, lock, hub, on_quit=stop.set)
+        worker.start()
+    else:
+        worker = None
 
     url = f"http://{cfg.host}:{cfg.port}"
     print(f"Game running at {url}   (Ctrl+C or the Quit button to stop)")
@@ -59,8 +71,9 @@ def main():
         pass
     finally:
         print("Shutting down...")
-        worker.stop()
-        worker.join(timeout=3)
+        if worker is not None:
+            worker.stop()
+            worker.join(timeout=3)
         server.shutdown()
         if cfg.save_history:
             try:

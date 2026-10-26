@@ -16,8 +16,19 @@ except Exception:                                  # not installed here: stub it
 from src.config import Config
 from src.game_engine import GameEngine
 from src.hand_tracker import HandResult
-from src.hub import Hub
 from src.vision_worker import HAND_COLORS, VisionWorker, hand_color
+
+
+class Hub:
+    def __init__(self):
+        self.seq = 0
+        self.payload = None
+        self.jpeg = None
+
+    def publish(self, jpeg, payload_json):
+        self.seq += 1
+        self.jpeg = jpeg
+        self.payload = payload_json
 from tests.test_gestures import make_hand
 
 

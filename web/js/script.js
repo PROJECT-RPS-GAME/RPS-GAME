@@ -2,8 +2,12 @@
 'use strict';
 
 const $ = (s) => document.querySelector(s);
-const EMOJI = { ROCK: '\u270A', PAPER: '\u270B', SCISSORS: '\u270C\uFE0F', UNKNOWN: '\u2754' };
 const NAME = { ROCK: 'ROCK', PAPER: 'PAPER', SCISSORS: 'SCISSORS' };
+const ICON_PATH = {
+  ROCK: 'assets/icon/rock.png',
+  PAPER: 'assets/icon/paper.png',
+  SCISSORS: 'assets/icon/scissor.png',
+};
 const TARGETS = [0, 3, 5];
 const MARGIN = 0.12;            // camera border that is mapped to the screen edge
 const PINCH_ON = 0.32, PINCH_OFF = 0.50, FREEZE_BELOW = 0.55;
@@ -22,7 +26,6 @@ const el = {
   flash: $('#jutsu-flash'), bannerResult: $('#banner-result'), msg: $('#msg'), history: $('#history'),
   scoreP1: $('#score-p1'), scoreP2: $('#score-p2'),
   btnNext: $('#btn-next'), btnRematch: $('#btn-rematch'), btnTarget: $('#btn-target'),
-  btnAuto: $('#btn-auto'), btnMute: $('#btn-mute'),
 };
 
 let state = null, prevPhase = null, prevSeq = null, prevLabel = '';
@@ -199,10 +202,12 @@ function act(name) {
     case 'menu': closeVideo(); show(el.howto, false); api('menu'); break;
     case 'auto':
       autoHighlight = !autoHighlight;
-      setText(el.btnAuto, 'Auto highlights: ' + (autoHighlight ? 'ON' : 'OFF')); break;
+      setText($('#btn-auto'), 'Auto highlights: ' + (autoHighlight ? 'ON' : 'OFF'));
+      break;
     case 'mute':
-      muted = !muted; el.hl.muted = muted;
-      setText(el.btnMute, muted ? 'Sound OFF' : 'Sound ON'); break;
+      muted = !muted;
+      el.hl.muted = muted;
+      break;
     case 'quit':
       fetch('/api/quit', { method: 'POST' }).catch(() => {});
       document.body.innerHTML = '<p style="color:#fff;font:24px sans-serif;text-align:center;margin-top:30vh">Game stopped. You can close this tab.</p>';
@@ -234,15 +239,26 @@ function roundBanner(s, n) {
 function pop(node) { node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); }
 
 function updateChips(container, items) {
-  items.forEach(([text, cls, ok], index) => {
+  items.forEach(([text, cls, ok, move], index) => {
     let item = container.children[index];
     if (!item) {
       item = document.createElement('div');
+      item.append(document.createElement('span'));
+      item.append(document.createElement('img'));
       container.append(item);
     }
     const className = 'chip ' + cls + (ok ? ' ok' : '');
     if (item.className !== className) item.className = className;
-    setText(item, text);
+    setText(item.querySelector('span'), text);
+    const icon = item.querySelector('img');
+    if (move && ICON_PATH[move]) {
+      icon.src = ICON_PATH[move];
+      icon.alt = move;
+      show(icon, true);
+    } else {
+      show(icon, false);
+      icon.removeAttribute('src');
+    }
   });
   while (container.children.length > items.length) container.lastElementChild.remove();
 }
@@ -251,6 +267,7 @@ function render(s) {
   const n = names(s), two = s.mode === 'two', phase = s.phase;
   const inMenu = phase === 'MENU';
   show(el.menu, inMenu); show(el.game, !inMenu);
+  setText($('#mode-label'), two ? '2 Players' : 'Player vs Computer');
 
   if (!inMenu && !camLoaded) { camLoaded = true; el.cam.src = '/video?' + Date.now(); }
   if (inMenu && camLoaded) { camLoaded = false; el.cam.removeAttribute('src'); }
@@ -258,6 +275,26 @@ function render(s) {
 
   // Score bar
   setText($('#name-p1'), n.p1); setText($('#name-p2'), n.p2);
+  const revealedMoves = (phase === 'RESULT' || phase === 'MATCH_OVER') && s.moves;
+  const liveP1 = s.live && s.live.p1;
+  const liveP2 = s.live && s.live.p2;
+  const playerMove = revealedMoves ? s.moves.p1 : (liveP1 && liveP1 !== 'UNKNOWN' ? liveP1 : 'ROCK');
+  const opponentMove = revealedMoves ? s.moves.p2 : (two && liveP2 !== 'UNKNOWN' ? liveP2 : null);
+  const playerPreview = $('#player-move-preview img');
+  playerPreview.src = ICON_PATH[playerMove] || ICON_PATH.ROCK;
+  playerPreview.alt = NAME[playerMove] || 'Rock';
+  const opponentPreview = $('#opponent-move-preview');
+  const opponentImage = opponentPreview.querySelector('img');
+  const opponentPlaceholder = opponentPreview.querySelector('span');
+  if (opponentMove && ICON_PATH[opponentMove]) {
+    opponentImage.src = ICON_PATH[opponentMove];
+    opponentImage.alt = NAME[opponentMove];
+    show(opponentImage, true);
+    show(opponentPlaceholder, false);
+  } else {
+    show(opponentImage, false);
+    show(opponentPlaceholder, true);
+  }
   const scoreChanged = el.scoreP1.textContent !== String(s.score.p1)
     || el.scoreP2.textContent !== String(s.score.p2);
   const p1Changed = el.scoreP1.textContent !== String(s.score.p1);
@@ -283,8 +320,8 @@ function render(s) {
   if (phase === 'READY') {
     updateChips(el.chips, players.map((p) => {
       const t = !s.present[p] ? 'show your hand' : (s.live && s.live[p] !== 'UNKNOWN'
-        ? EMOJI[s.live[p]] + ' ' + NAME[s.live[p]] : 'hand detected');
-      return [n[p] + ': ' + t, p, s.present[p]];
+        ? NAME[s.live[p]] : 'hand detected');
+      return [n[p] + ': ' + t, p, s.present[p], s.live && s.live[p] !== 'UNKNOWN' ? s.live[p] : null];
     }));
   }
   if (phase === 'COUNTDOWN') {
@@ -303,10 +340,16 @@ function render(s) {
 
   if ((phase === 'RESULT' || phase === 'MATCH_OVER') && s.moves) {
     setText($('#who-p1'), n.p1); setText($('#who-p2'), n.p2);
-    setText($('#mv-p1'), EMOJI[s.moves.p1]); setText($('#mv-p2'), EMOJI[s.moves.p2]);
+    $('#mv-p1').src = ICON_PATH[s.moves.p1] || '';
+    $('#mv-p2').src = ICON_PATH[s.moves.p2] || '';
+    $('#mv-p1').alt = NAME[s.moves.p1] || '';
+    $('#mv-p2').alt = NAME[s.moves.p2] || '';
     setText($('#mn-p1'), NAME[s.moves.p1]); setText($('#mn-p2'), NAME[s.moves.p2]);
     const [t, cls] = roundBanner(s, n);
-    setText(el.bannerResult, t); el.bannerResult.className = cls;
+    setText(el.bannerResult, t); el.bannerResult.className = cls + ' result-value';
+  } else {
+    setText(el.bannerResult, '—');
+    el.bannerResult.className = 'result-value';
   }
 
   // Buttons / messages
@@ -321,7 +364,15 @@ function render(s) {
     el.history.replaceChildren(...s.history.map((h) => {
       const d = document.createElement('div');
       d.className = 'hrow ' + (h.winner === 'p1' ? 'w1' : h.winner === 'p2' ? 'w2' : 'd');
-      d.textContent = EMOJI[h.p1] + ' vs ' + EMOJI[h.p2];
+      const p1Icon = document.createElement('img');
+      p1Icon.src = ICON_PATH[h.p1];
+      p1Icon.alt = NAME[h.p1] || '';
+      const vs = document.createElement('span');
+      vs.textContent = 'vs';
+      const p2Icon = document.createElement('img');
+      p2Icon.src = ICON_PATH[h.p2];
+      p2Icon.alt = NAME[h.p2] || '';
+      d.append(p1Icon, vs, p2Icon);
       return d;
     }));
   }
@@ -464,6 +515,12 @@ requestAnimationFrame(cursorFrame);
 /* ---------- live data ---------- */
 function onFrame(data) {
   lastData = data; serverDown = false; demo = !!data.demo;
+  const cameraCaption = $('#camera-caption');
+  if (cameraCaption) {
+    setText(cameraCaption, data.camera_ok ? 'Show your hand to the camera'
+      : (data.error || 'Camera not available'));
+    cameraCaption.classList.toggle('camera-error', !data.camera_ok);
+  }
   updateBanner();
   if (data.state) {
     state = data.state;

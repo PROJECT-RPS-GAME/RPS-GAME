@@ -6,7 +6,6 @@ import time
 import cv2
 
 from .camera import CameraManager
-from .clap_detector import ClapDetector
 from .config import UNKNOWN
 from .gesture_classifier import classify_gesture
 from .hand_tracker import HandTracker, HAND_CONNECTIONS
@@ -48,7 +47,6 @@ class VisionWorker(threading.Thread):
         self._camera_factory = camera_factory or CameraManager
         self._clock = clock or time.monotonic
         self._on_quit = on_quit
-        self._clap_detector = ClapDetector()
         self.smoothers = {"p1": LandmarkSmoother(cfg.lm_min_cutoff, cfg.lm_beta),
                           "p2": LandmarkSmoother(cfg.lm_min_cutoff, cfg.lm_beta)}
         self.pointer_smoother = PointSmoother(cfg.ptr_min_cutoff, cfg.ptr_beta)
@@ -107,12 +105,6 @@ class VisionWorker(threading.Thread):
                 except Exception as exc:               # never crash on a bad frame
                     print("warning: hand tracking failed:", exc)
                     hands = []
-
-                if self._clap_detector.update(hands, now):
-                    print("Clap detected - shutting down.")
-                    if self._on_quit is not None:
-                        self._on_quit()
-                    break
 
                 with self.lock:
                     mode = self.engine.mode
