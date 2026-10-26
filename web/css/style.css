@@ -56,7 +56,10 @@ body {
   gap: 2vh;
   padding: 2vh 3vw;
   text-align: center;
-  overflow-y: auto
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y
 }
 
 .overlay {
@@ -1404,12 +1407,28 @@ body {
   background: rgba(8, 18, 43, .9);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
+  html {
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
   .game-screen {
     height: auto;
+    min-height: 100vh;
     min-height: 100dvh;
     grid-template-rows: auto auto auto auto;
-    overflow-y: auto;
+    overflow: visible;
+    touch-action: pan-y;
   }
 
   .game-topbar {
@@ -1443,6 +1462,16 @@ body {
 
   .bottom-grid {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-height: 700px) and (min-width: 901px) {
+  .game-screen {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    grid-template-rows: auto auto auto auto;
+    overflow-y: auto;
   }
 }
 
@@ -1482,6 +1511,14 @@ body {
     grid-row: 2;
     grid-template-rows: auto minmax(105px, 1fr) auto;
     gap: 7px;
+  }
+
+  .fighter-p1 {
+    grid-column: 1;
+  }
+
+  .fighter-p2 {
+    grid-column: 2;
   }
 
   .fighter-heading {
