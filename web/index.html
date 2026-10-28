@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rock Paper Scissors</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="bg"></div>
+
+<div id="banner" hidden></div>
+
+<!-- Splash: a real click/key here unlocks browser audio -->
+<section id="splash" class="screen overlay">
+  <div class="kanji"></div>
+  <h1 class="title"><br>ROCK&nbsp;PAPER&nbsp;SCISSORS</h1>
+  <button class="btn primary big" data-act="enter">ENTER THE DOJO</button>
+  <p class="hint">Click once with the mouse (or press any key) so sound can play.<br>After that you can control everything with your hand.</p>
+</section>
+
+<!-- Main menu -->
+<section id="menu" class="screen" hidden>
+  <h1 class="title"><br>ROCK&nbsp;PAPER&nbsp;SCISSORS</h1>
+  <p class="sub">Show your hand to the camera and duel with ninja hand signs</p>
+  <div class="menu-buttons">
+    <button class="btn primary" data-act="play-cpu"><img class="ico" src="assets/icon/single.png" alt="" aria-hidden="true"> 1 Computer</button>
+    <button class="btn primary" data-act="play-two"><img class="ico" src="assets/icon/frineds.png" alt="" aria-hidden="true"> 2 Players</button>
+    <button class="btn" data-act="target" id="btn-target">Match: Free play</button>
+    <button class="btn" data-act="highlights"><img class="ico" src="assets/icon/highlight.png" alt="" aria-hidden="true"> Watch highlights</button>
+    <button class="btn" data-act="howto"><img class="ico" src="assets/icon/qa.png" alt="" aria-hidden="true"> How to play</button>
+    <button class="btn" data-act="auto" id="btn-auto">Auto highlights: ON</button>
+    <button class="btn danger" data-act="quit">Quit</button>
+  </div>
+  <p class="hint">Point with your <b>index finger</b> to highlight a button, then <b>pinch</b> (thumb + index) to click it.</p>
+</section>
+
+<!-- Player setup -->
+<section id="setup" class="screen overlay" role="dialog" aria-modal="true"
+  aria-labelledby="setup-title" hidden>
+  <div class="setup-card">
+    <div class="setup-mark" aria-hidden="true"></div>
+    <h2 id="setup-title">SET UP YOUR MATCH</h2>
+    <p class="setup-intro">Choose the names shown during your match.</p>
+    <div class="name-fields">
+      <label class="name-field" for="p1-name">
+        <span id="p1-label">Player 1</span>
+        <input id="p1-name" name="player1" type="text" maxlength="20"
+          autocomplete="nickname" value="Player 1" required>
+      </label>
+      <label class="name-field" id="p2-field" for="p2-name">
+        <span>Player 2 name</span>
+        <input id="p2-name" name="player2" type="text" maxlength="20"
+          autocomplete="off" value="Player 2" required>
+      </label>
+      <div class="opponent-card" id="computer-opponent" hidden>
+        <span>Opponent</span>
+        <strong>COMPUTER</strong>
+      </div>
+    </div>
+    <p id="setup-error" role="alert" hidden></p>
+    <div class="setup-actions">
+      <button class="btn" type="button" data-act="cancel-setup">Back</button>
+      <button class="btn primary" type="button" id="start-match" data-act="start-match">Start Match</button>
+    </div>
+  </div>
+</section>
+
+<!-- Game screen -->
+<section id="game" class="screen game-screen" hidden>
+  <header class="game-topbar">
+    <button class="mode-pill" data-act="menu" aria-label="Back to game menu">
+      <span aria-hidden="true">♟</span><span id="mode-label">Player vs Computer</span><span aria-hidden="true"></span>
+    </button>
+    <h1 class="game-logo"><span>ROCK</span> <span>PAPER</span> <span>SCISSORS</span></h1>
+    <div class="top-actions">
+      <button class="icon-btn" data-act="howto" aria-label="How to play" title="How to play">⚙</button>
+    </div>
+  </header>
+
+  <main class="battle-grid">
+    <section class="fighter-panel fighter-p1" aria-label="Player status">
+      <div class="fighter-heading"><span class="fighter-icon" aria-hidden="true">♟</span><span class="pname" id="name-p1">PLAYER</span></div>
+      <div class="fighter-move">
+        <span class="move-symbol" id="player-move-preview" aria-hidden="true">
+          <img class="move-preview-image" src="assets/icon/rock.png" alt="">
+        </span>
+        <span class="move-caption">Your Move</span>
+      </div>
+      <div class="fighter-score"><span class="score-icon" aria-hidden="true">♜</span><span class="score-label">Score</span><span class="pscore" id="score-p1">0</span></div>
+    </section>
+
+    <section class="camera-column" aria-label="Camera and round status">
+      <div id="stage">
+        <img id="cam" alt="Live webcam feed">
+        <div class="camera-label"><span aria-hidden="true">▣</span> Camera</div>
+        <div id="divider" hidden><span class="tag l">PLAYER 1</span><span class="tag r">PLAYER 2</span></div>
+
+        <div id="ov-ready" class="ov" hidden>
+          <div class="ov-title">READY?</div>
+          <div class="ov-text">Show your hand to the camera</div>
+          <div id="chips"></div>
+        </div>
+
+        <div id="ov-count" class="ov" hidden><div id="count-num">3</div><div id="count-sub"></div></div>
+
+        <div id="ov-capture" class="ov" hidden>
+          <div id="go-text">GO!</div>
+          <div class="ov-text">Show ROCK, PAPER or SCISSORS and hold it</div>
+          <div id="locks"></div>
+        </div>
+
+        <div id="ov-result" class="ov" hidden>
+          <div id="jutsu-flash"></div>
+          <div class="moves">
+            <div class="move"><div class="who" id="who-p1">YOU</div><img class="emoji" id="mv-p1" alt=""><div class="mname" id="mn-p1"></div></div>
+            <div class="vs">VS</div>
+            <div class="move"><div class="who" id="who-p2">COMPUTER</div><img class="emoji" id="mv-p2" alt=""><div class="mname" id="mn-p2"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="camera-caption" id="camera-caption">Show your hand to the camera</div>
+    </section>
+
+    <section class="fighter-panel fighter-p2" aria-label="Opponent status">
+      <div class="fighter-heading"><span class="fighter-icon" aria-hidden="true">▣</span><span class="pname" id="name-p2">COMPUTER</span></div>
+      <div class="fighter-move opponent-move">
+        <span class="move-symbol" id="opponent-move-preview" aria-hidden="true">
+          <img class="move-preview-image" hidden alt="">
+          <span>?</span>
+        </span>
+        <span class="move-caption">Computer Move</span>
+      </div>
+      <div class="fighter-score"><span class="score-icon" aria-hidden="true">♜</span><span class="score-label">Score</span><span class="pscore" id="score-p2">0</span></div>
+    </section>
+  </main>
+
+  <section class="bottom-grid">
+    <div class="info-panel moves-panel">
+      <div class="round-heading"><span id="round-info">Round 1</span><span id="draws">Draws 0</span></div>
+      <div class="gesture-options" aria-label="Rock paper scissors gestures">
+        <div class="gesture-choice rock"><span><img src="assets/icon/rock.png" alt=""></span><b>Rock</b></div>
+        <div class="gesture-choice paper"><span><img src="assets/icon/paper.png" alt=""></span><b>Paper</b></div>
+        <div class="gesture-choice scissors"><span><img src="assets/icon/scissor.png" alt=""></span><b>Scissors</b></div>
+      </div>
+    </div>
+
+    <div class="info-panel result-panel">
+      <h2><span aria-hidden="true">♜</span> Result</h2>
+      <div id="banner-result" class="result-value">—</div>
+    </div>
+
+    <div class="info-panel history-panel">
+      <h2><span aria-hidden="true">◷</span> Game History</h2>
+      <div id="history" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <div class="game-footer">
+    <div id="msg" role="status"></div>
+    <div id="controls">
+      <button class="btn primary" id="btn-next" data-act="next" hidden>Start round</button>
+      <button class="btn" id="btn-rematch" data-act="rematch" hidden>Rematch</button>
+      <button class="btn" data-act="menu">Menu</button>
+    </div>
+  </div>
+</section>
+
+<!-- Match over -->
+<section id="matchover" class="screen overlay" hidden>
+  <div class="kanji"></div>
+  <p id="mo-congrats">CONGRATULATIONS!</p>
+  <h2 id="mo-title">PLAYER 1 WINS THE MATCH</h2>
+  <div id="mo-score"></div>
+  <div class="menu-buttons row">
+    <button class="btn primary" data-act="watch"><span class="ico">&#127916;</span> Watch highlight</button>
+    <button class="btn primary" data-act="rematch">Rematch</button>
+    <button class="btn" data-act="menu">Menu</button>
+  </div>
+</section>
+
+<!-- How to play -->
+<section id="howto" class="screen overlay" hidden>
+  <h2>HOW TO PLAY</h2>
+  <div class="howto-grid">
+    <div><img class="emoji" src="assets/icon/rock.png" alt=""><b>ROCK</b><br>closed fist</div>
+    <div><img class="emoji" src="assets/icon/paper.png" alt=""><b>PAPER</b><br>open hand, fingers out</div>
+    <div><img class="emoji" src="assets/icon/scissor.png" alt=""><b>SCISSORS</b><br>index + middle finger</div>
+  </div>
+  <ul class="rules">
+    <li>Press <b>Start round</b>. After <b>3 - 2 - 1 - GO!</b> show your sign and hold it still.</li>
+    <li><b>2 players:</b> Player 1 stands on the <b>left</b> half of the camera, Player 2 on the <b>right</b>.</li>
+    <li><b>Menus:</b> point with your index finger to highlight a button, then pinch thumb + index to click it. Holding still will not click.</li>
+    <li>Rock beats Scissors, Scissors beats Paper, Paper beats Rock.</li>
+  </ul>
+  <button class="btn primary" data-act="close-howto">Got it</button>
+</section>
+
+<!-- Highlight video -->
+<section id="videoModal" class="screen overlay" role="dialog" aria-modal="true"
+  aria-label=" match highlight" hidden>
+  <div id="highlight-player">
+    <div id="highlight-winner" hidden></div>
+    <video id="hl" src="assets/media/highlight.mp4" controls playsinline preload="metadata"
+      aria-label="Itachi match highlight video"></video>
+  </div>
+  <button class="btn primary" data-act="close-video">Close video</button>
+</section>
+
+<div id="cursor"></div>
+<audio id="sfx-jutsu" src="assets/sounds/mixkit-animated-small-group-applause-523.wav" preload="auto"></audio>
+<script src="js/script.js"></script>
+</body>
+</html>
