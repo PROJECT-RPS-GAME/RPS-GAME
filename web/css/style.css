@@ -70,11 +70,6 @@ body {
   backdrop-filter: blur(6px)
 }
 
-#videoModal {
-  z-index: 70;
-  background: rgba(0, 0, 0, .94)
-}
-
 #matchover {
   z-index: 60
 }
@@ -707,47 +702,6 @@ body {
   color: #dfe8ff
 }
 
-#highlight-player {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: min(94vw, 1100px);
-  max-height: 78vh
-}
-
-#hl {
-  display: block;
-  max-width: 94vw;
-  max-height: 78vh;
-  border-radius: 12px;
-  border: 2px solid var(--orange);
-  background: #000
-}
-
-#highlight-winner {
-  position: absolute;
-  z-index: 1;
-  top: clamp(12px, 3vh, 28px);
-  left: 50%;
-  max-width: calc(100% - 28px);
-  padding: .45em .9em;
-  transform: translateX(-50%);
-  overflow: hidden;
-  border: 1px solid rgba(255, 209, 153, .75);
-  border-radius: 999px;
-  background: rgba(8, 12, 28, .82);
-  color: var(--orange2);
-  font-family: Impact, "Arial Black", sans-serif;
-  font-size: clamp(20px, 5vw, 42px);
-  letter-spacing: .06em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-shadow: 0 0 18px var(--orange);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, .45);
-  pointer-events: none
-}
-
 #banner {
   position: fixed;
   top: 10px;
@@ -991,7 +945,9 @@ body {
 .top-actions {
   justify-self: end;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
 }
 
 .icon-btn {
@@ -1058,7 +1014,6 @@ body {
   overflow: hidden;
 }
 
-.fighter-icon,
 .score-icon {
   color: var(--fighter-light);
   font-size: 24px;
@@ -1374,13 +1329,17 @@ body {
 }
 
 #msg {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
-  text-align: right;
+  text-align: center;
 }
 
 #controls {
-  gap: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 #controls .btn {
@@ -1495,6 +1454,19 @@ body {
 
   .top-actions {
     gap: 6px;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: stretch;
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  #controls {
+    min-width: 0;
+    flex: 1;
+    flex-wrap: nowrap;
+    gap: 6px;
   }
 
   .battle-grid {
@@ -1560,20 +1532,11 @@ body {
     min-height: 90px;
   }
 
-  .game-footer {
-    flex-direction: column-reverse;
-  }
-
-  #msg {
-    flex: 0 0 auto;
-    text-align: center;
-  }
-
-  #controls {
-    width: 100%;
-  }
-
   #controls .btn {
-    flex: 1;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: .45em .7em;
+    font-size: 12px;
+    white-space: nowrap;
   }
 }

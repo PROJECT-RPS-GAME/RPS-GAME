@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace as H
 
 from src.players import assign_hands
-from src.pointer import pinch_ratio
+from src.pointer import pinch_ratio, pointer_position
 
 
 def hand(x, area=0.1):
@@ -49,6 +49,12 @@ class PinchTest(unittest.TestCase):
 
     def test_open_large_ratio(self):
         self.assertGreater(pinch_ratio(self._hand(0.2)), 0.5)
+
+    def test_pointer_uses_middle_fingertip(self):
+        lm = self._hand(0.2)
+        lm[8] = (0.25, 0.3)
+        lm[12] = (0.75, 0.6)
+        self.assertEqual(pointer_position(lm), (0.75, 0.6))
 
 
 if __name__ == "__main__":

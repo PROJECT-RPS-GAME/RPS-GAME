@@ -1,7 +1,7 @@
 """Hand-as-mouse helpers: pointer position and pinch (click) measurement."""
 import math
 
-THUMB_TIP, INDEX_TIP, WRIST, MIDDLE_MCP = 4, 8, 0, 9
+THUMB_TIP, INDEX_TIP, MIDDLE_TIP, WRIST, MIDDLE_MCP = 4, 8, 12, 0, 9
 
 
 def _dist(a, b):
@@ -9,8 +9,8 @@ def _dist(a, b):
 
 
 def pointer_position(landmarks):
-    """Index fingertip in normalised image coordinates."""
-    return landmarks[INDEX_TIP]
+    """Middle fingertip in normalised image coordinates."""
+    return landmarks[MIDDLE_TIP]
 
 
 def pinch_ratio(landmarks):

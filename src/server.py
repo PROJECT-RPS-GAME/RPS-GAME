@@ -4,18 +4,38 @@ import json
 import time
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request, send_file, stream_with_context
+from flask import (Flask, Response, jsonify, request, send_file,
+                   send_from_directory, stream_with_context)
+
+from .audio import win_sound_path
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB_ROOT = ROOT / "web"
+ASSET_ROOT = ROOT / "assets"
 
 
-def create_app(engine, lock, hub, on_quit=None, demo_worker=None):
-    app = Flask(__name__, static_folder=str(WEB_ROOT), static_url_path="")
+def create_app(engine, lock, hub, on_quit=None):
+    app = Flask(__name__, static_folder=None)
 
     @app.get("/")
     def index():
         return send_file(WEB_ROOT / "index.html")
+
+    @app.get("/css/<path:filename>")
+    def css(filename):
+        return send_from_directory(WEB_ROOT / "css", filename)
+
+    @app.get("/js/<path:filename>")
+    def javascript(filename):
+        return send_from_directory(WEB_ROOT / "js", filename)
+
+    @app.get("/assets/<path:filename>")
+    def assets(filename):
+        return send_from_directory(ASSET_ROOT, filename)
+
+    @app.get("/audio/win")
+    def win_audio():
+        return send_file(win_sound_path(ASSET_ROOT), mimetype="audio/wav")
 
     @app.get("/health")
     def health():
@@ -26,14 +46,7 @@ def create_app(engine, lock, hub, on_quit=None, demo_worker=None):
         def generate():
             seq = 0
             while True:
-                if hasattr(hub, "wait_for_update"):
-                    next_seq, jpeg, _ = hub.wait_for_update(seq, timeout=1.0)
-                else:
-                    next_seq = getattr(hub, "seq", seq)
-                    jpeg = getattr(hub, "jpeg", None)
-                    if next_seq == seq:
-                        time.sleep(0.05)
-                        continue
+                next_seq, jpeg, _ = hub.wait_for_update(seq, timeout=1.0)
                 if next_seq == seq:
                     continue
                 seq = next_seq
@@ -59,13 +72,7 @@ def create_app(engine, lock, hub, on_quit=None, demo_worker=None):
         def generate():
             seq = 0
             while True:
-                if hasattr(hub, "wait_for_update"):
-                    next_seq, _, latest_payload = hub.wait_for_update(seq, timeout=0.25)
-                else:
-                    next_seq = getattr(hub, "seq", seq)
-                    latest_payload = getattr(hub, "payload", None)
-                    if next_seq == seq:
-                        time.sleep(0.25)
+                next_seq, _, latest_payload = hub.wait_for_update(seq, timeout=0.25)
                 if next_seq > seq:
                     seq = next_seq
                 if latest_payload:
@@ -76,7 +83,6 @@ def create_app(engine, lock, hub, on_quit=None, demo_worker=None):
                     payload = {
                         "camera_ok": True,
                         "error": None,
-                        "demo": False,
                         "state": state,
                         "pointer": None,
                     }
@@ -115,20 +121,6 @@ def create_app(engine, lock, hub, on_quit=None, demo_worker=None):
     def api_quit():
         if on_quit is not None:
             on_quit()
-        return jsonify({"ok": True})
-
-    @app.post("/api/demo_input")
-    def api_demo_input():
-        payload = request.get_json(silent=True) or {}
-        player = payload.get("player")
-        gesture = payload.get("gesture")
-        if player not in {"p1", "p2"} or gesture not in {"ROCK", "PAPER", "SCISSORS"}:
-            return jsonify({"error": "invalid demo input"}), 400
-        with lock:
-            engine.present[player] = True
-            engine.live[player] = gesture
-            engine.update({"p1": (engine.live.get("p1", "UNKNOWN"), engine.present.get("p1", False)),
-                           "p2": (engine.live.get("p2", "UNKNOWN"), engine.present.get("p2", False))}, time.monotonic())
         return jsonify({"ok": True})
 
     return app

@@ -22,9 +22,6 @@ class RoundHistory:
     def __len__(self):
         return len(self._rounds)
 
-    def all(self):
-        return list(self._rounds)
-
     def reset(self):
         self._rounds.clear()
 

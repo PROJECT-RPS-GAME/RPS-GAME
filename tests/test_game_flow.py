@@ -1,7 +1,7 @@
 import unittest
 
 from src.config import Config, ROCK, PAPER, SCISSORS, UNKNOWN
-from src.game_engine import GameEngine
+from src.game_controller import GameController
 
 
 class FixedComputer:
@@ -17,7 +17,7 @@ def make(mode="cpu", target=None, move=ROCK, **kw):
     cfg = Config(stability_frames=3, stability_ratio=1.0, countdown_seconds=3,
                  result_seconds=2.0, capture_timeout_two=5.0, **kw)
     comp = FixedComputer(move)
-    e = GameEngine(cfg, comp)
+    e = GameController(cfg, comp)
     e.start(mode, None, 0.0)
     if target is not None:
         e.target = target          # bypass the UI-only 0/3/5 choices for short tests
@@ -144,7 +144,7 @@ class TwoPlayerTest(unittest.TestCase):
 
 class MiscTest(unittest.TestCase):
     def test_custom_player_names_are_kept_in_snapshot_and_rematch(self):
-        e = GameEngine(Config())
+        e = GameController(Config())
         e.start("two", 3, 0.0, {"p1": "  Naruto  ", "p2": "Sasuke"})
         snap = e.snapshot(0.0)
         self.assertEqual(snap["player_names"], {"p1": "Naruto", "p2": "Sasuke"})
@@ -152,7 +152,7 @@ class MiscTest(unittest.TestCase):
         self.assertEqual(e.snapshot(1.0)["player_names"], {"p1": "Naruto", "p2": "Sasuke"})
 
     def test_player_name_validation(self):
-        e = GameEngine(Config())
+        e = GameController(Config())
         for invalid in ("", "   ", "x" * 21, None):
             with self.subTest(name=invalid), self.assertRaises(ValueError):
                 e.start("cpu", 3, 0.0, {"p1": invalid})

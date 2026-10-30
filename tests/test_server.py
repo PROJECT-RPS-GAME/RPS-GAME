@@ -3,16 +3,39 @@ import threading
 import time
 import unittest
 
-from app import Hub
+from main import Hub
 from src.config import Config
-from src.game_engine import GameEngine
+from src.game_controller import GameController
 from src.server import create_app
 
 
 class VideoStreamTest(unittest.TestCase):
+    def test_round_controls_are_in_top_right_actions(self):
+        app = create_app(GameController(Config()), threading.Lock(), Hub())
+        with app.test_client().get("/") as page:
+            self.assertEqual(page.status_code, 200)
+
+            header = page.data.split(b'<header class="game-topbar">', 1)[1].split(b"</header>", 1)[0]
+            self.assertIn(b'<div class="top-actions">', header)
+            self.assertIn(b'<div id="controls">', header)
+            self.assertIn(b'id="btn-next"', header)
+            self.assertIn(b'id="btn-rematch"', header)
+            self.assertIn(b'data-act="menu"', header)
+            footer = page.data.split(b'<div class="game-footer">', 1)[1]
+            self.assertNotIn(b'<div id="controls">', footer)
+
+    def test_project_assets_are_served(self):
+        app = create_app(GameController(Config()), threading.Lock(), Hub())
+        client = app.test_client()
+        for path in ("/css/style.css", "/js/script.js", "/assets/icons/rock.png",
+                     "/audio/win"):
+            with client.get(path) as response:
+                self.assertEqual(response.status_code, 200, path)
+        self.assertEqual(client.get("/assets/videos/highlight.mp4").status_code, 404)
+
     def test_video_endpoint_streams_new_frames_without_reconnecting(self):
         hub = Hub()
-        app = create_app(GameEngine(Config()), threading.Lock(), hub)
+        app = create_app(GameController(Config()), threading.Lock(), hub)
 
         def publish_frames():
             time.sleep(0.05)

@@ -4,9 +4,9 @@
 const $ = (s) => document.querySelector(s);
 const NAME = { ROCK: 'ROCK', PAPER: 'PAPER', SCISSORS: 'SCISSORS' };
 const ICON_PATH = {
-  ROCK: 'assets/icon/rock.png',
-  PAPER: 'assets/icon/paper.png',
-  SCISSORS: 'assets/icon/scissor.png',
+  ROCK: '/assets/icons/rock.png',
+  PAPER: '/assets/icons/paper.png',
+  SCISSORS: '/assets/icons/scissor.png',
 };
 const TARGETS = [0, 3, 5];
 const MARGIN = 0.12;            // camera border that is mapped to the screen edge
@@ -17,8 +17,7 @@ const el = {
   setup: $('#setup'), p1Name: $('#p1-name'), p2Name: $('#p2-name'),
   p2Field: $('#p2-field'), computerOpponent: $('#computer-opponent'),
   p1Label: $('#p1-label'), setupError: $('#setup-error'), startMatch: $('#start-match'),
-  highlightWinner: $('#highlight-winner'),
-  howto: $('#howto'), videoModal: $('#videoModal'), hl: $('#hl'), sfx: $('#sfx-jutsu'),
+  howto: $('#howto'), sfx: $('#sfx-jutsu'),
   cam: $('#cam'), divider: $('#divider'), dividerP1: $('#divider .tag.l'),
   dividerP2: $('#divider .tag.r'), banner: $('#banner'), cursor: $('#cursor'),
   ovReady: $('#ov-ready'), ovCount: $('#ov-count'), ovCapture: $('#ov-capture'), ovResult: $('#ov-result'),
@@ -29,11 +28,10 @@ const el = {
 };
 
 let state = null, prevPhase = null, prevSeq = null, prevLabel = '';
-let menuTarget = 0, autoHighlight = true, muted = false, audioReady = false;
+let menuTarget = 0, muted = false, audioReady = false;
 let setupMode = 'cpu';
 let startingMatch = false;
-let camLoaded = false, serverDown = false, lastData = null, demo = false;
-let videoRequest = 0;
+let camLoaded = false, serverDown = false, lastData = null;
 let historyKey = null;
 const activeAnimations = new WeakMap();
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -87,7 +85,7 @@ async function api(action, extra) {
   }
 }
 
-/* ---------- audio / video ---------- */
+/* ---------- audio ---------- */
 function unlockAudio() {
   if (audioReady) return;
   audioReady = true;
@@ -101,38 +99,6 @@ function playJutsu() {
   if (muted) return;
   try { el.sfx.currentTime = 0; el.sfx.play().catch(() => {}); } catch (e) { /* ignore */ }
 }
-function openVideo(winnerName = '') {
-  if (isOpen(el.videoModal)) return;
-  if (winnerName) {
-    setText(el.highlightWinner, winnerName + ' WINS!');
-    show(el.highlightWinner, true);
-  } else {
-    setText(el.highlightWinner, '');
-    show(el.highlightWinner, false);
-  }
-  show(el.videoModal, true);
-  el.hl.muted = muted; el.hl.currentTime = 0;
-  const request = ++videoRequest;
-  el.hl.play().catch((error) => {
-    if (request !== videoRequest || !isOpen(el.videoModal)) return;
-    if (!el.hl.muted) {
-      el.hl.muted = true;
-      el.hl.play().catch((fallbackError) => {
-        if (request === videoRequest && isOpen(el.videoModal)) {
-          console.error('Could not play the highlight video:', fallbackError);
-        }
-      });
-      return;
-    }
-    console.error('Could not play the highlight video:', error);
-  });
-}
-function closeVideo() {
-  videoRequest++;
-  el.hl.pause(); show(el.videoModal, false);
-}
-el.hl.addEventListener('ended', closeVideo);
-
 function openSetup(mode) {
   setupMode = mode;
   const cpu = mode === 'cpu';
@@ -190,23 +156,13 @@ function act(name) {
     case 'target':
       menuTarget = TARGETS[(TARGETS.indexOf(menuTarget) + 1) % TARGETS.length];
       setText(el.btnTarget, 'Match: ' + targetLabel(menuTarget)); break;
-    case 'highlights': openVideo(); break;
-    case 'watch':
-      openVideo(state && state.match_winner ? names(state)[state.match_winner] : '');
-      break;
     case 'howto': show(el.howto, true); break;
     case 'close-howto': show(el.howto, false); break;
-    case 'close-video': closeVideo(); break;
     case 'next': api('next'); break;
     case 'rematch': api('rematch'); break;
-    case 'menu': closeVideo(); show(el.howto, false); api('menu'); break;
-    case 'auto':
-      autoHighlight = !autoHighlight;
-      setText($('#btn-auto'), 'Auto highlights: ' + (autoHighlight ? 'ON' : 'OFF'));
-      break;
+    case 'menu': show(el.howto, false); api('menu'); break;
     case 'mute':
       muted = !muted;
-      el.hl.muted = muted;
       break;
     case 'quit':
       fetch('/api/quit', { method: 'POST' }).catch(() => {});
@@ -275,6 +231,7 @@ function render(s) {
 
   // Score bar
   setText($('#name-p1'), n.p1); setText($('#name-p2'), n.p2);
+  setText($('.opponent-move .move-caption'), two ? n.p2 + "'s Move" : 'Computer Move');
   const revealedMoves = (phase === 'RESULT' || phase === 'MATCH_OVER') && s.moves;
   const liveP1 = s.live && s.live.p1;
   const liveP2 = s.live && s.live.p2;
@@ -398,14 +355,6 @@ function effects(s) {
     }
     pop(el.bannerResult);
   }
-  // Match just ended -> highlight video
-  if (s.phase === 'MATCH_OVER' && prevPhase !== 'MATCH_OVER' && autoHighlight) {
-    setTimeout(() => {
-      if (autoHighlight && state && state.phase === 'MATCH_OVER' && state.match_winner) {
-        openVideo(names(state)[state.match_winner]);
-      }
-    }, 1500);
-  }
   prevPhase = s.phase;
 }
 
@@ -432,7 +381,7 @@ let hoverBtn = null, focusSince = 0, focusX = 0, focusY = 0, lastFire = 0;
 function setPointer(p) { if (p) { latest = p; latestAt = performance.now(); } else { latest = null; } }
 
 function pointerAllowed() {
-  if (isOpen(el.splash) || isOpen(el.setup) || isOpen(el.videoModal) || isOpen(el.howto)) return true;
+  if (isOpen(el.splash) || isOpen(el.setup) || isOpen(el.howto)) return true;
   return !!state && ['MENU', 'READY', 'RESULT', 'MATCH_OVER'].includes(state.phase);
 }
 
@@ -514,7 +463,7 @@ requestAnimationFrame(cursorFrame);
 
 /* ---------- live data ---------- */
 function onFrame(data) {
-  lastData = data; serverDown = false; demo = !!data.demo;
+  lastData = data; serverDown = false;
   const cameraCaption = $('#camera-caption');
   if (cameraCaption) {
     setText(cameraCaption, data.camera_ok ? 'Show your hand to the camera'
@@ -540,26 +489,18 @@ el.cam.addEventListener('error', () => {
 });
 
 /* ---------- keyboard / mouse fallbacks ---------- */
-const DEMO_KEYS = { q: ['p1', 'ROCK'], w: ['p1', 'PAPER'], e: ['p1', 'SCISSORS'],
-                    i: ['p2', 'ROCK'], o: ['p2', 'PAPER'], p: ['p2', 'SCISSORS'] };
-
 document.addEventListener('pointerdown', (e) => { if (e.isTrusted) unlockAudio(); });
 document.addEventListener('keydown', (e) => {
   if (e.isTrusted) unlockAudio();
   if (isOpen(el.splash)) { act('enter'); return; }
   const k = e.key.toLowerCase();
   if (e.key === 'Escape') {
-    if (isOpen(el.videoModal)) closeVideo();
-    else if (isOpen(el.howto)) show(el.howto, false);
+    if (isOpen(el.howto)) show(el.howto, false);
     else if (isOpen(el.setup)) show(el.setup, false);
     else act('menu');
   } else if (e.key === ' ' || e.key === 'Enter') {
     if (state && (state.phase === 'READY' || (state.phase === 'RESULT' && !state.match_winner))) { e.preventDefault(); act('next'); }
-  } else if (k === 'm') { act('mute'); }
-  else if (demo && DEMO_KEYS[k]) {
-    fetch('/api/demo_input', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ player: DEMO_KEYS[k][0], gesture: DEMO_KEYS[k][1] }) }).catch(() => {});
-  }
+  }   else if (k === 'm') { act('mute'); }
 });
 
 connect();

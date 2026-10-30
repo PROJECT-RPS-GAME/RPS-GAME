@@ -11,13 +11,14 @@ from .config import Config, UNKNOWN, VALID_MOVES, WIN, LOSE
 from .game_rules import decide
 from .gesture_stabilizer import GestureStabilizer
 from .history import RoundHistory
+from .score_manager import ScoreManager
 
 MODES = ("cpu", "two")
 TARGETS = (0, 3, 5)
 PLAYERS = ("p1", "p2")
 
 
-class GameEngine:
+class GameController:
     def __init__(self, cfg=None, computer=None):
         self.cfg = cfg or Config()
         self.computer = computer or ComputerPlayer()
@@ -28,7 +29,7 @@ class GameEngine:
         self.mode = "cpu"
         self.player_names = {"p1": "Player 1", "p2": "Computer"}
         self.target = self.cfg.target_score
-        self.score = {"p1": 0, "p2": 0, "draws": 0}
+        self.score_manager = ScoreManager()
         self.moves = {"p1": None, "p2": None}
         self.round_winner = None
         self.live = {"p1": UNKNOWN, "p2": UNKNOWN}
@@ -39,7 +40,11 @@ class GameEngine:
     # ---- derived ------------------------------------------------------
     @property
     def rounds(self):
-        return self.score["p1"] + self.score["p2"] + self.score["draws"]
+        return self.score_manager.rounds
+
+    @property
+    def score(self):
+        return self.score_manager.score
 
     @property
     def match_winner(self):
@@ -65,7 +70,7 @@ class GameEngine:
             s.reset()
 
     def _reset_match(self):
-        self.score = {"p1": 0, "p2": 0, "draws": 0}
+        self.score_manager.reset()
         self.history.reset()
         self._clear_round()
         self.message = ""
@@ -171,10 +176,7 @@ class GameEngine:
     def _finish_round(self, now):
         result = decide(self.moves["p1"], self.moves["p2"])
         self.round_winner = "p1" if result == WIN else "p2" if result == LOSE else "draw"
-        if self.round_winner == "draw":
-            self.score["draws"] += 1
-        else:
-            self.score[self.round_winner] += 1
+        self.score_manager.record(self.round_winner)
         self.history.add(self.moves["p1"], self.moves["p2"], self.round_winner, self.mode)
         self.seq += 1
         self._set("RESULT", now)

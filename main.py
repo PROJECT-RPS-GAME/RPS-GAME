@@ -7,7 +7,7 @@ import webbrowser
 from werkzeug.serving import make_server
 
 from src.config import Config
-from src.game_engine import GameEngine
+from src.game_controller import GameController
 from src.server import create_app
 
 
@@ -33,7 +33,6 @@ class Hub:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--demo", action="store_true", help="keyboard demo, no camera")
     ap.add_argument("--camera", type=int, help="camera index (default from src/config.py)")
     ap.add_argument("--port", type=int, help="web server port")
     ap.add_argument("--no-browser", action="store_true", help="do not open the browser")
@@ -45,19 +44,16 @@ def main():
     if args.port:
         cfg.port = args.port
 
-    engine, lock, hub = GameEngine(cfg), threading.Lock(), Hub()
+    engine, lock, hub = GameController(cfg), threading.Lock(), Hub()
     stop = threading.Event()
 
     app = create_app(engine, lock, hub, on_quit=stop.set)
     server = make_server(cfg.host, cfg.port, app, threaded=True)
     threading.Thread(target=server.serve_forever, daemon=True, name="http").start()
 
-    if not args.demo:
-        from src.vision_worker import VisionWorker
-        worker = VisionWorker(cfg, engine, lock, hub, on_quit=stop.set)
-        worker.start()
-    else:
-        worker = None
+    from src.vision_worker import VisionWorker
+    worker = VisionWorker(cfg, engine, lock, hub)
+    worker.start()
 
     url = f"http://{cfg.host}:{cfg.port}"
     print(f"Game running at {url}   (Ctrl+C or the Quit button to stop)")
@@ -71,9 +67,8 @@ def main():
         pass
     finally:
         print("Shutting down...")
-        if worker is not None:
-            worker.stop()
-            worker.join(timeout=3)
+        worker.stop()
+        worker.join(timeout=3)
         server.shutdown()
         if cfg.save_history:
             try:

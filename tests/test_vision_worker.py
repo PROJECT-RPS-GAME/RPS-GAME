@@ -14,9 +14,10 @@ except Exception:                                  # not installed here: stub it
     sys.modules["mediapipe"] = types.ModuleType("mediapipe")
 
 from src.config import Config
-from src.game_engine import GameEngine
+from src.game_controller import GameController
 from src.hand_tracker import HandResult
-from src.vision_worker import HAND_COLORS, VisionWorker, hand_color
+from src.renderer import HAND_COLORS, hand_color
+from src.vision_worker import VisionWorker
 
 
 class Hub:
@@ -89,7 +90,7 @@ class WorkerTest(unittest.TestCase):
 
     def run_worker(self, hands_fn, mode="cpu", frames=90):
         cfg = Config(stability_frames=3, stability_ratio=1.0)
-        engine, lock, hub = GameEngine(cfg), threading.Lock(), RecordingHub()
+        engine, lock, hub = GameController(cfg), threading.Lock(), RecordingHub()
         engine.start(mode, None, 0.0)
         clock_t = [0.0]
 
@@ -117,7 +118,7 @@ class WorkerTest(unittest.TestCase):
 
         def hands(i):
             lm = noisy(base, rng)
-            raw_x.append(lm[8][0])
+            raw_x.append(lm[12][0])
             return [hand_result(lm)]
 
         engine, hub = self.run_worker(hands)
@@ -131,6 +132,23 @@ class WorkerTest(unittest.TestCase):
         self.assertLess(std(out), std(raw_x[20:len(out) + 20]) * 0.5)
         self.assertEqual(engine.live["p1"], "PAPER")
         self.assertTrue(engine.present["p1"])
+
+    def test_pointer_tracks_slow_middle_finger_motion_without_double_smoothing(self):
+        raw_x = []
+        base = make_hand(1, 1, 1, 1)
+
+        def hands(i):
+            lm = list(base)
+            x = 0.3 + i * 0.001
+            lm[12] = (x, lm[12][1])
+            raw_x.append(x)
+            return [hand_result(lm)]
+
+        _, hub = self.run_worker(hands)
+        frames = [p for _, p in hub.log if p["camera_ok"] and p["pointer"]]
+        errors = [abs(frame["pointer"]["x"] - target)
+                  for frame, target in zip(frames, raw_x)][20:]
+        self.assertLess(sum(errors) / len(errors), 0.0035)
 
     def test_two_players_assigned_by_side(self):
         left = make_hand(0, 0, 0, 0)                      # rock, x around 0.5 -> shift left

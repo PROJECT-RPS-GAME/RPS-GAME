@@ -32,13 +32,10 @@ class CameraManager:
             return False
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.cfg.frame_width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.cfg.frame_height)
+        cap.set(cv2.CAP_PROP_FPS, self.cfg.camera_fps)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)      # always the newest frame, less lag
         self._cap, self.index, self._failures = cap, idx, 0
         return True
-
-    @property
-    def connected(self):
-        return self._cap is not None
 
     def read(self):
         """Return a BGR frame, or None if unavailable (reconnects about once per second)."""

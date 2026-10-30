@@ -8,36 +8,15 @@ import cv2
 from .camera import CameraManager
 from .config import UNKNOWN
 from .gesture_classifier import classify_gesture
-from .hand_tracker import HandTracker, HAND_CONNECTIONS
+from .hand_tracker import HandTracker
 from .players import assign_hands
 from .pointer import pinch_ratio, pointer_position
+from .renderer import draw_hand, draw_player_divider, hand_color
 from .smoothing import LandmarkSmoother, PointSmoother
-
-HAND_COLORS = {"Left": (0, 0, 255), "Right": (0, 0, 0)}  # BGR
-UNKNOWN_HAND_COLOR = (210, 210, 210)
-
-
-def hand_color(hand):
-    """Return a visible BGR tracking color for MediaPipe's handedness label."""
-    return HAND_COLORS.get(hand.label, UNKNOWN_HAND_COLOR)
-
-
-def draw_hand(img, hand, color):
-    h, w = img.shape[:2]
-    pts = [(int(x * w), int(y * h)) for x, y in hand.landmarks]
-    for a, b in HAND_CONNECTIONS:
-        cv2.line(img, pts[a], pts[b], (255, 255, 255), 4, cv2.LINE_AA)
-        cv2.line(img, pts[a], pts[b], color, 2, cv2.LINE_AA)
-    for p in pts:
-        cv2.circle(img, p, 5, (255, 255, 255), -1, cv2.LINE_AA)
-        cv2.circle(img, p, 3, color, -1, cv2.LINE_AA)
-    cv2.circle(img, pts[8], 10, (255, 255, 255), 4, cv2.LINE_AA)
-    cv2.circle(img, pts[8], 9, color, 2, cv2.LINE_AA)
-
 
 class VisionWorker(threading.Thread):
     def __init__(self, cfg, engine, lock, hub, tracker_factory=None, camera_factory=None,
-                 clock=None, on_quit=None):
+                 clock=None):
         super().__init__(daemon=True, name="vision")
         self.cfg, self.engine, self.lock, self.hub = cfg, engine, lock, hub
         self._stop_evt = threading.Event()
@@ -46,7 +25,6 @@ class VisionWorker(threading.Thread):
         self._tracker_factory = tracker_factory or HandTracker
         self._camera_factory = camera_factory or CameraManager
         self._clock = clock or time.monotonic
-        self._on_quit = on_quit
         self.smoothers = {"p1": LandmarkSmoother(cfg.lm_min_cutoff, cfg.lm_beta),
                           "p2": LandmarkSmoother(cfg.lm_min_cutoff, cfg.lm_beta)}
         self.pointer_smoother = PointSmoother(cfg.ptr_min_cutoff, cfg.ptr_beta)
@@ -57,7 +35,7 @@ class VisionWorker(threading.Thread):
     # -- helpers -----------------------------------------------------
     def _publish(self, jpeg, state, pointer, ok, error, fps):
         self.hub.publish(jpeg, json.dumps({
-            "camera_ok": ok, "error": error, "demo": False,
+            "camera_ok": ok, "error": error,
             "fps": round(fps, 1), "state": state, "pointer": pointer}))
 
     def _idle_state(self):
@@ -109,6 +87,14 @@ class VisionWorker(threading.Thread):
                 with self.lock:
                     mode = self.engine.mode
                 assigned = assign_hands(hands, mode, cfg.split_x)
+                pointer_hand = max(
+                    (hand for hand in assigned.values() if hand is not None),
+                    key=lambda hand: hand.area,
+                    default=None,
+                )
+                raw_pointer_position = (
+                    pointer_position(pointer_hand.landmarks) if pointer_hand is not None else None
+                )
                 per_player = {}
                 for pid in ("p1", "p2"):
                     h = assigned[pid]
@@ -120,11 +106,9 @@ class VisionWorker(threading.Thread):
                         per_player[pid] = (classify_gesture(h.landmarks, cfg.extended_ratio, cfg.folded_ratio), True)
 
                 pointer = None
-                present = [h for h in assigned.values() if h is not None]
-                if present:
-                    big = max(present, key=lambda h: h.area)
-                    ratio = pinch_ratio(big.landmarks)
-                    x, y = pointer_position(big.landmarks)
+                if pointer_hand is not None and raw_pointer_position is not None:
+                    ratio = pinch_ratio(pointer_hand.landmarks)
+                    x, y = raw_pointer_position
                     x, y = self.pointer_smoother.update(x, y, ratio, now)
                     pointer = {"x": round(x, 4), "y": round(y, 4), "ratio": round(ratio, 3)}
 
@@ -135,9 +119,7 @@ class VisionWorker(threading.Thread):
                 for h in hands:
                     draw_hand(frame, h, hand_color(h))
                 if mode == "two":
-                    x = int(frame.shape[1] * cfg.split_x)
-                    for y in range(0, frame.shape[0], 24):
-                        cv2.line(frame, (x, y), (x, y + 12), (255, 255, 255), 1)
+                    draw_player_divider(frame, cfg.split_x)
 
                 ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, cfg.jpeg_quality])
                 dt = now - last
